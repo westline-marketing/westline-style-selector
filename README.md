@@ -100,6 +100,10 @@ npm i ../path-to-style-selector/westline-style-selector-<version>.tgz
 
 Substitute the actual version from `package.json` for `<version>`. When finished testing, switch the consumer back to the published version.
 
+## Checks
+
+`npm run preflight` runs whitespace, typecheck, tests and the build in seconds; a pre-push hook runs it (`npm install` sets the hook up).
+
 ## Full Guide
 
 See [GUIDE.md](./GUIDE.md) for install, layout wiring, env setup, and deployment notes for separate repos on Vercel and Railway.

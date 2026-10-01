@@ -1,0 +1,18 @@
+#!/bin/sh
+# Runs `npm run preflight` (scripts/preflight.sh) on the checked-out commit before a
+# push; CI runs the same checks in its `preflight` job. npm install points git here
+# (prepare -> scripts/install-git-hooks.sh). Skip once with --no-verify.
+[ -z "${CI:-}" ] || exit 0
+head=$(git rev-parse HEAD)
+pushing=0
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac # branch deletion
+  case "$local_ref" in refs/tags/*) continue ;; esac
+  if [ "$local_sha" != "$head" ]; then
+    echo "preflight: $local_ref is not the checked-out commit; check it out and push again." >&2
+    exit 1
+  fi
+  pushing=1
+done
+[ "$pushing" = 1 ] || exit 0
+exec npm run --silent preflight
