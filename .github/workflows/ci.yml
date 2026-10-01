@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   # The pre-push hook's checks (`npm run preflight`): whitespace, typecheck, tests, build.
-  # The first PR-time check in this repository; no ruleset requires it.
+  # Typecheck runs only here; `checks` repeats the tests and build the publish workflow gates on.
   preflight:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
@@ -34,3 +34,38 @@ jobs:
 
       - name: Preflight
         run: npm run preflight -- --base HEAD^1
+
+  checks:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # Aggregate check. Fails unless both jobs succeeded, so a failed, cancelled or skipped
+  # job cannot pass it. No ruleset requires it yet.
+  ci:
+    if: always()
+    needs: [preflight, checks]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    steps:
+      - name: Require preflight and checks
+        env:
+          PREFLIGHT: ${{ needs.preflight.result }}
+          CHECKS: ${{ needs.checks.result }}
+        run: |
+          echo "preflight: $PREFLIGHT, checks: $CHECKS"
+          [ "$PREFLIGHT" = success ] && [ "$CHECKS" = success ]
