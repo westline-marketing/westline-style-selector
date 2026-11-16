@@ -14,7 +14,7 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
@@ -28,15 +28,38 @@ jobs:
           tracked=$(git ls-files -- ':(glob)**/.claude/settings.local.json')
           if [ -n "$tracked" ]; then
             echo "::error::.claude/settings.local.json is machine-local and must not be tracked. Run: git rm --cached <path>"
-            printf '%s\n' "$tracked" | sed 's/^/  /'
+            printf '%s\n' "$tracked" | sed 's/^/  - /'
             status=1
           fi
 
-          pattern='PGPASSWORD=[^$* "]|MYSQL_PWD=[^$* "]|sshpass +-p *[^$* "-]|[Aa]uthorization: *(Bearer|Basic|token) +[A-Za-z0-9._~+/=-]{8,}|://[^/:@ "]+:[^/@ "$*{]+@|sk_live_[A-Za-z0-9]{8,}|rk_live_[A-Za-z0-9]{8,}|sk-ant-[A-Za-z0-9_-]{8,}|sk-proj-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|shpat_[A-Fa-f0-9]{16,}|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|npg_[A-Za-z0-9]{8,}|\bre_[A-Za-z0-9_]{20,}'
-          hits=$(git ls-files -z -- ':(glob)**/.claude/*.json' | xargs -0 -r grep -HnoE -- "$pattern" | cut -d: -f1-2 | sort -u || true)
-          if [ -n "$hits" ]; then
+          shapes=(
+            '(PGPASSWORD|MYSQL_PWD)=[^$*" :\\]'
+            'sshpass +-p *[^$*" :\\-]'
+            'curl [^"]*-u +[^ $:"\\]+:[^ $*"\\]'
+            '"[A-Z0-9_]*(PASSWORD|PASSWD|SECRET|TOKEN|API_KEY|APIKEY|PRIVATE_KEY)[A-Z0-9_]*" *: *"[^"$*{<]'
+            '[Aa]uthorization: *([Bb]earer|[Bb]asic|[Tt]oken) +[A-Za-z0-9._~+/=-]{8,}'
+            '[Xx]-[Aa]pi-[Kk]ey: *[A-Za-z0-9._-]{12,}'
+            '://[^/:@ "]*:[^/@ "$*{<]+@'
+            'eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.'
+            'sk_(live|test)_[A-Za-z0-9]{8,}' 'rk_live_[A-Za-z0-9]{8,}' 'whsec_[A-Za-z0-9]{16,}'
+            'sk-ant-[A-Za-z0-9_-]{8,}' 'sk-proj-[A-Za-z0-9_-]{8,}' 'sk-or-v1-[a-f0-9]{16,}'
+            'gh[pousr]_[A-Za-z0-9]{20,}' 'github_pat_[A-Za-z0-9_]{20,}' 'npm_[A-Za-z0-9]{36}'
+            'shpat_[A-Fa-f0-9]{16,}' 'xox[abpr]-[A-Za-z0-9-]{10,}' 'hooks\.slack\.com/services/T[A-Z0-9]+/'
+            'AKIA[0-9A-Z]{16}' 'AIza[0-9A-Za-z_-]{35}' 'npg_[A-Za-z0-9]{8,}' 'ops_[A-Za-z0-9_-]{20,}'
+            '\bre_[A-Za-z0-9]{6,}_[A-Za-z0-9]{16,}'
+          )
+          pattern=$(IFS='|'; echo "${shapes[*]}")
+
+          # git grep exits 1 for no match and 128 on error, so a broken scan fails instead of passing.
+          rc=0
+          matches=$(git grep -InoE --no-color -e "$pattern" -- ':(glob)**/.claude/*.json' ':(glob)**/.mcp.json') || rc=$?
+          if [ "$rc" -gt 1 ]; then
+            echo "::error::Secret scan failed (git grep exit $rc)."
+            exit "$rc"
+          fi
+          if [ "$rc" -eq 0 ]; then
             echo "::error::Claude settings contain a literal secret. Rotate it, then replace the rule with a pattern or an op run / env reference:"
-            printf '%s\n' "$hits" | sed 's/^/  /'
+            printf '%s\n' "$matches" | cut -d: -f1-2 | sort -u | sed 's/^/  - /'
             status=1
           fi
 
