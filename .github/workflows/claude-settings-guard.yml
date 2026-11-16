@@ -1,0 +1,44 @@
+name: Claude settings guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  claude-settings-guard:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # "Yes, and don't ask again" saves the literal approved command into
+      # .claude/settings.local.json, secrets included. Only the file and line are printed.
+      - name: No tracked local settings, no literal secrets in Claude settings
+        run: |
+          set -euo pipefail
+          status=0
+
+          tracked=$(git ls-files -- ':(glob)**/.claude/settings.local.json')
+          if [ -n "$tracked" ]; then
+            echo "::error::.claude/settings.local.json is machine-local and must not be tracked. Run: git rm --cached <path>"
+            printf '%s\n' "$tracked" | sed 's/^/  /'
+            status=1
+          fi
+
+          pattern='PGPASSWORD=[^$* "]|MYSQL_PWD=[^$* "]|sshpass +-p *[^$* "-]|[Aa]uthorization: *(Bearer|Basic|token) +[A-Za-z0-9._~+/=-]{8,}|://[^/:@ "]+:[^/@ "$*{]+@|sk_live_[A-Za-z0-9]{8,}|rk_live_[A-Za-z0-9]{8,}|sk-ant-[A-Za-z0-9_-]{8,}|sk-proj-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|shpat_[A-Fa-f0-9]{16,}|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|npg_[A-Za-z0-9]{8,}|\bre_[A-Za-z0-9_]{20,}'
+          hits=$(git ls-files -z -- ':(glob)**/.claude/*.json' | xargs -0 -r grep -HnoE -- "$pattern" | cut -d: -f1-2 | sort -u || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Claude settings contain a literal secret. Rotate it, then replace the rule with a pattern or an op run / env reference:"
+            printf '%s\n' "$hits" | sed 's/^/  /'
+            status=1
+          fi
+
+          [ "$status" -eq 0 ] && echo "Claude settings guard passed."
+          exit "$status"
