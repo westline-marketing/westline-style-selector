@@ -16,3 +16,6 @@ dist/
 .claude/skills/obsidian-cli/
 .claude/skills/json-canvas/
 .claude/skills/defuddle/
+
+# Claude Code saves "don't ask again" approvals here verbatim, secrets included. Machine-local.
+**/.claude/settings.local.json
