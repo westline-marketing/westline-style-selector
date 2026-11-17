@@ -1,6 +1,6 @@
 {
   "name": "@westline/style-selector",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "description": "Reusable style selector engine for Westline client projects.",
   "license": "UNLICENSED",

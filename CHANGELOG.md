@@ -3,6 +3,14 @@
 All notable changes to `@westline/style-selector` are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-11-17
+
+### Changed
+- Published from GitHub Actions with npm trusted publishing (OIDC) and provenance; no long-lived npm token.
+- README: notes on the preflight check and pre-push hook.
+
+No API changes.
+
 ## [0.2.0] - 2026-05-12
 
 ### Changed (breaking)
