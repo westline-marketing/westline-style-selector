@@ -30,5 +30,6 @@ jobs:
       - run: npm test
       - run: npm run build
       # npm trusted publishing: the job's OIDC token (id-token: write) replaces
-      # a stored npm token, and npm adds provenance automatically.
-      - run: npm publish --access public
+      # a stored npm token. npm only accepts provenance from GitHub-hosted
+      # runners, so it is off here to keep the job on Blacksmith.
+      - run: npm publish --access public --provenance=false
